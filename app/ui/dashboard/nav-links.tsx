@@ -8,25 +8,46 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
+import type { UserRole } from '@/app/lib/definitions';
 
 // Map of links to display in the side navigation.
 // Depending on the size of the application, this would be stored in a database.
 const links = [
-  { name: 'Home', href: '/dashboard', icon: HomeIcon },
+  { name: 'Home', href: '/dashboard', icon: HomeIcon, roles: ['admin'] },
   {
     name: 'Invoices',
     href: '/dashboard/invoices',
     icon: DocumentDuplicateIcon,
+    roles: ['admin'],
   },
-  { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon },
+  { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon, roles: ['admin'] },
+  {
+    name: 'Appointments',
+    href: '/dashboard/appointments',
+    icon: UserGroupIcon,
+    roles: ['admin', 'doctor', 'patient', 'pharmacy_reception'],
+  },
+  {
+    name: 'Inventory',
+    href: '/dashboard/pharmacy/stock',
+    icon: DocumentDuplicateIcon,
+    roles: ['pharmacy_stocker'],
+  },
+  {
+    name: 'Prescription queue',
+    href: '/dashboard/pharmacy/pharmacist',
+    icon: DocumentDuplicateIcon,
+    roles: ['pharmacist'],
+  },
 ];
 
-export default function NavLinks() {
+export default function NavLinks({ role }: { role: UserRole }) {
   const pathname = usePathname();
+  const visibleLinks = links.filter((link) => link.roles.includes(role));
 
   return (
     <>
-      {links.map((link) => {
+      {visibleLinks.map((link) => {
         const LinkIcon = link.icon;
         return (
           <Link

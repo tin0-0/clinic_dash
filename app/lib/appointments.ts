@@ -1,0 +1,17 @@
+export const visitTypes = [
+  { value: 'routine', label: 'Routine and preventive care', duration: 30 },
+  { value: 'acute', label: 'Acute illness or infection', duration: 20 },
+  { value: 'chronic', label: 'Chronic condition management', duration: 40 },
+  { value: 'symptoms', label: 'New or concerning symptoms', duration: 45 },
+  { value: 'mental_health', label: 'Mental health or administrative', duration: 15 },
+] as const;
+
+export const appointmentStatuses = [
+  'scheduled',
+  'confirmed',
+  'checked_in',
+  'completed',
+  'cancelled',
+] as const;
+
+export type AppointmentStatus = (typeof appointmentStatuses)[number];

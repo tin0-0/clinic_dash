@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import postgres from 'postgres';
 import { invoices, customers, revenue, users } from '../lib/placeholder-data';
 
@@ -11,8 +11,14 @@ async function seedUsers() {
       id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       email TEXT NOT NULL UNIQUE,
-      password TEXT NOT NULL
+      password TEXT NOT NULL,
+      role VARCHAR(50) NOT NULL DEFAULT 'patient'
     );
+  `;
+
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'patient';
   `;
 
   const insertedUsers = await Promise.all(
@@ -101,6 +107,27 @@ async function seedRevenue() {
   return insertedRevenue;
 }
 
+async function seedAppointments() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS appointments (
+      id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+      patient_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+      doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+      appointment_date DATE NOT NULL,
+      start_time TIME NOT NULL,
+      duration_minutes INT NOT NULL,
+      visit_type VARCHAR(50) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'scheduled'
+        CHECK (status IN ('scheduled', 'confirmed', 'checked_in', 'completed', 'cancelled')),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS appointments_doctor_date_idx
+    ON appointments (doctor_id, appointment_date, status);`;
+  await sql`CREATE INDEX IF NOT EXISTS appointments_patient_date_idx
+    ON appointments (patient_id, appointment_date, status);`;
+}
+
 export async function GET() {
   try {
     const result = await sql.begin((sql) => [
@@ -109,6 +136,7 @@ export async function GET() {
       seedInvoices(),
       seedRevenue(),
     ]);
+    await seedAppointments();
 
     return Response.json({ message: 'Database seeded successfully' });
   } catch (error) {

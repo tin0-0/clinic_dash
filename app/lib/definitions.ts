@@ -7,7 +7,16 @@ export type User = {
   name: string;
   email: string;
   password: string;
+  role: UserRole;
 };
+
+export type UserRole =
+  | 'admin'
+  | 'doctor'
+  | 'patient'
+  | 'pharmacy_reception'
+  | 'pharmacy_stocker'
+  | 'pharmacist';
 
 export type Customer = {
   id: string;
