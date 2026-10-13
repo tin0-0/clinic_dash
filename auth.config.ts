@@ -17,7 +17,7 @@ function isUserRole(role: unknown): role is UserRole {
 function hasDashboardAccess(pathname: string, role: UserRole) {
   if (pathname.startsWith('/dashboard/notifications')) return true;
   if (pathname.startsWith('/dashboard/wallet')) return role === 'patient';
-  if (pathname.startsWith('/dashboard/user')) {
+  if (pathname === '/dashboard/user' || pathname.startsWith('/dashboard/user/')) {
     return role === 'patient';
   }
   if (pathname.startsWith('/dashboard/doctor')) {
