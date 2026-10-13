@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import TopUpForm from '@/app/ui/wallet/top-up-form';
 import PayInvoiceForm from '@/app/ui/wallet/pay-invoice-form';
 import { formatCurrency } from '@/app/lib/utils';
+import { isPaymentSimulationEnabled } from '@/app/lib/payment-mode';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require', prepare: false });
 
@@ -35,6 +36,7 @@ export default async function WalletPage(props: {
   ]);
   const searchParams = await props.searchParams;
   const balance = wallet[0]?.balance_cents ?? 0;
+  const simulatedPayments = isPaymentSimulationEnabled();
 
   return (
     <main className="max-w-4xl space-y-8">
@@ -52,6 +54,11 @@ export default async function WalletPage(props: {
           Top-up cancelled. No funds were added.
         </p>
       )}
+      {simulatedPayments && (
+        <p className="border-l-4 border-amber-500 bg-amber-50 p-3 text-sm text-amber-950">
+          Payment simulation is on. Top-ups are fake local credits; no card is charged.
+        </p>
+      )}
       <section className="grid gap-8 border-b border-gray-200 pb-8 sm:grid-cols-2">
         <div>
           <p className="text-sm font-medium text-gray-600">Available balance</p>
@@ -59,7 +66,7 @@ export default async function WalletPage(props: {
         </div>
         <div>
           <h2 className="mb-3 text-lg font-semibold text-gray-900">Add funds</h2>
-          <TopUpForm />
+          <TopUpForm simulated={simulatedPayments} />
         </div>
       </section>
       <section>

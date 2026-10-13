@@ -243,11 +243,17 @@ async function seedPayments() {
       invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
       stripe_session_id TEXT NOT NULL UNIQUE,
       amount_cents INT NOT NULL CHECK (amount_cents > 0),
+      provider VARCHAR(20) NOT NULL DEFAULT 'stripe'
+        CHECK (provider IN ('stripe', 'simulated')),
       status VARCHAR(20) NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'paid', 'expired')),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       paid_at TIMESTAMPTZ
     );
+  `;
+  await sql`
+    ALTER TABLE invoice_payments
+    ADD COLUMN IF NOT EXISTS provider VARCHAR(20) NOT NULL DEFAULT 'stripe';
   `;
   await sql`
     CREATE TABLE IF NOT EXISTS stripe_webhook_events (
@@ -262,6 +268,10 @@ async function seedPayments() {
 }
 
 export async function GET() {
+  if (process.env.NODE_ENV === 'production') {
+    return new Response(null, { status: 404 });
+  }
+
   try {
     await seedUsers();
     await seedDoctorAvailability();

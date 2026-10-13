@@ -63,28 +63,34 @@ medication from an appointment, and pharmacists can dispense prescriptions when
 inventory is sufficient. Dispensing updates stock transactionally.
 
 The dashboard currently has a revenue bar chart; the brief does not specify a
-pie chart. Payment processing, wallets, and invoice emails still need product
-setup before they can run. Stripe Checkout handles USD card payments, the
-patient wallet supports prepaid top-ups and invoice payments, and Resend sends
-invoice payment links.
+pie chart. Local development defaults to simulated payments: admins can mark
+invoices paid in the simulator, and patients can simulate wallet top-ups without
+charging a card. For real USD payments, Stripe Checkout handles invoice payments
+and wallet top-ups. Resend sends invoice payment links.
 
 ## Database setup
 
-The `/seed` route initializes users, customers, invoices, revenue, appointments,
 doctor availability, pharmacy inventory, prescriptions, and notifications. It
-is intended only for local setup; do not expose the seed route in a production
 deployment. The app uses PostgreSQL through the `POSTGRES_URL` environment
-variable.
+The `/seed` route initializes users, customers, invoices, revenue, appointments,
+doctor availability, pharmacy inventory, prescriptions, notifications, and
+payment records. It is intended only for local setup; do not expose the seed
+route in a production deployment. The app uses PostgreSQL through the
+`POSTGRES_URL` environment variable.
 
 ## Payment and email setup
 
-1. Copy `.env.example` values into `.env.local` and replace each placeholder.
-2. In Stripe, use a test-mode secret key for `STRIPE_SECRET_KEY`.
-3. Install Stripe CLI and run `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
-	Set the printed signing secret as `STRIPE_WEBHOOK_SECRET`.
-4. In Resend, create an API key and verify a sending domain. Set
-	`RESEND_API_KEY` and `RESEND_FROM_EMAIL` to that key and a sender on the
-	verified domain.
+1. For local demos, set `PAYMENTS_MODE=simulated` in `.env.local`. No Stripe
+	account, Stripe CLI, Resend account, or payment credentials are needed. The
+	simulator is disabled outside development and clearly labels fake payments.
+2. To test real payments, set `PAYMENTS_MODE=stripe` and use a Stripe test-mode
+	secret key for `STRIPE_SECRET_KEY`.
+3. Install Stripe CLI and run
+	`stripe listen --forward-to localhost:3000/api/stripe/webhook`. Set its
+	printed signing secret as `STRIPE_WEBHOOK_SECRET`.
+4. To send real invoice emails, create a Resend API key and verify a sending
+	domain. Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` to the key and a sender
+	on that verified domain.
 5. Set `APP_URL` to the app's origin. Use `http://localhost:3000` locally.
 
 Invoice emails contain a Stripe Checkout link. Wallet top-ups are credited only

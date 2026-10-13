@@ -24,7 +24,8 @@ export async function POST(request: Request) {
     const checkout = event.data.object;
     await sql`
       UPDATE invoice_payments SET status = 'expired'
-      WHERE stripe_session_id = ${checkout.id} AND status = 'pending'
+      WHERE stripe_session_id = ${checkout.id}
+        AND provider = 'stripe' AND status = 'pending'
     `;
     return Response.json({ received: true });
   }
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
           FROM invoice_payments
           JOIN invoices ON invoices.id = invoice_payments.invoice_id
           WHERE invoice_payments.stripe_session_id = ${checkout.id}
+            AND invoice_payments.provider = 'stripe'
             AND invoice_payments.invoice_id = ${checkout.metadata.invoiceId}
           FOR UPDATE OF invoice_payments, invoices
         `;

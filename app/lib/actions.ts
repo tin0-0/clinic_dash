@@ -10,6 +10,9 @@ import bcrypt from 'bcryptjs';
 import { appointmentStatuses, visitTypes, weekdays } from '@/app/lib/appointments';
 import { Resend } from 'resend';
 import { getAppUrl, getStripe } from '@/app/lib/stripe';
+import { randomUUID } from 'node:crypto';
+import { formatCurrency } from '@/app/lib/utils';
+import { isPaymentSimulationEnabled } from '@/app/lib/payment-mode';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require', prepare: false });
 
@@ -221,6 +224,7 @@ export async function sendInvoiceEmail(
 ): Promise<string | undefined> {
   const session = await auth();
   if (session?.user.role !== 'admin') return 'Only administrators can email invoices.';
+  if (isPaymentSimulationEnabled()) return 'Invoice email is unavailable in simulation mode. Switch PAYMENTS_MODE to stripe to use Resend.';
 
   const invoiceId = z.string().uuid().safeParse(formData.get('invoiceId'));
   if (!invoiceId.success) return 'Invalid invoice.';
@@ -301,6 +305,71 @@ export async function sendInvoiceEmail(
   return `Payment link sent to ${invoice.customer_email}.`;
 }
 
+export async function simulateInvoicePayment(
+  _prevState: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  const session = await auth();
+  if (session?.user.role !== 'admin') return 'Only administrators can simulate invoice payments.';
+  if (!isPaymentSimulationEnabled()) return 'Invoice simulation is enabled only in local development mode.';
+
+  const invoiceId = z.string().uuid().safeParse(formData.get('invoiceId'));
+  if (!invoiceId.success) return 'Invalid invoice.';
+
+  try {
+    await sql.begin(async (transaction) => {
+      const invoices = await transaction`
+        SELECT id, amount FROM invoices
+        WHERE id = ${invoiceId.data} AND status = 'pending'
+        FOR UPDATE
+      `;
+      if (!invoices[0]) throw new Error('INVOICE_UNAVAILABLE');
+
+      const openCheckouts = await transaction`
+        SELECT id FROM invoice_payments
+        WHERE invoice_id = ${invoiceId.data} AND status = 'pending'
+        FOR UPDATE
+      `;
+      if (openCheckouts.length) throw new Error('STRIPE_CHECKOUT_PENDING');
+
+      const paymentReference = `sim_${randomUUID()}`;
+      await transaction`
+        UPDATE invoices SET status = 'paid'
+        WHERE id = ${invoiceId.data} AND status = 'pending'
+      `;
+      await transaction`
+        INSERT INTO invoice_payments (
+          invoice_id, stripe_session_id, amount_cents, provider, status, paid_at
+        ) VALUES (
+          ${invoiceId.data}, ${paymentReference}, ${invoices[0].amount},
+          'simulated', 'paid', NOW()
+        )
+      `;
+      await transaction`
+        INSERT INTO notifications (recipient_id, title, message, href)
+        SELECT users.id, 'Invoice paid', 'Your invoice payment was recorded in local simulation mode.', '/dashboard/appointments'
+        FROM invoices
+        JOIN customers ON customers.id = invoices.customer_id
+        JOIN users ON LOWER(users.email) = LOWER(customers.email)
+        WHERE invoices.id = ${invoiceId.data}
+      `;
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'INVOICE_UNAVAILABLE') {
+      return 'This invoice is unavailable or has already been paid.';
+    }
+    if (error instanceof Error && error.message === 'STRIPE_CHECKOUT_PENDING') {
+      return 'An emailed Stripe payment link is already active for this invoice.';
+    }
+    console.error('Failed to simulate invoice payment:', error);
+    return 'Could not simulate this invoice payment.';
+  }
+
+  revalidatePath('/dashboard/invoices');
+  revalidatePath('/dashboard');
+  return 'Payment simulated. No card was charged.';
+}
+
 export async function createWalletTopUp(
   _prevState: string | undefined,
   formData: FormData,
@@ -309,6 +378,32 @@ export async function createWalletTopUp(
   if (session?.user.role !== 'patient') return 'Only patient accounts can use a wallet.';
   const parsedAmount = z.coerce.number().min(10).max(500).multipleOf(0.01).safeParse(formData.get('amount'));
   if (!parsedAmount.success) return 'Choose a top-up amount between $10 and $500.';
+
+  const amountCents = Math.round(parsedAmount.data * 100);
+  if (isPaymentSimulationEnabled()) {
+    try {
+      await sql.begin(async (transaction) => {
+        await transaction`
+          INSERT INTO wallet_accounts (user_id)
+          VALUES (${session.user.id}) ON CONFLICT (user_id) DO NOTHING
+        `;
+        await transaction`
+          INSERT INTO wallet_transactions (user_id, amount_cents, transaction_type)
+          VALUES (${session.user.id}, ${amountCents}, 'top_up')
+        `;
+        await transaction`
+          UPDATE wallet_accounts
+          SET balance_cents = balance_cents + ${amountCents}, updated_at = NOW()
+          WHERE user_id = ${session.user.id}
+        `;
+      });
+    } catch (error) {
+      console.error('Failed to simulate wallet top-up:', error);
+      return 'Could not simulate this wallet top-up.';
+    }
+    revalidatePath('/dashboard/wallet');
+    return `Payment simulated. ${formatCurrency(amountCents)} added to your wallet; no card was charged.`;
+  }
 
   let stripe: ReturnType<typeof getStripe>;
   let appUrl: string;
@@ -319,7 +414,6 @@ export async function createWalletTopUp(
     return error instanceof Error ? error.message : 'Stripe is not configured.';
   }
 
-  const amountCents = Math.round(parsedAmount.data * 100);
   let checkoutUrl: string;
   try {
     const checkout = await stripe.checkout.sessions.create({
@@ -432,7 +526,7 @@ export async function addMedication(formData: FormData) {
     sku: z.string().trim().min(1).max(60),
     quantity: z.coerce.number().int().min(0),
     reorderLevel: z.coerce.number().int().min(0),
-    expirationDate: z.string().optional(),
+    expirationDate: z.string().nullable().optional(),
   }).safeParse({
     name: formData.get('name'),
     sku: formData.get('sku'),
