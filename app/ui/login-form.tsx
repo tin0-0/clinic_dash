@@ -10,11 +10,13 @@ import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import { Button } from '@/app/ui/button';
 import { useActionState } from 'react';
 import { authenticate } from '@/app/lib/actions';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 export default function LoginForm() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const registered = searchParams.get('registered') === '1';
   const [errorMessage, formAction, isPending] = useActionState(
     authenticate,
     undefined,
@@ -71,6 +73,14 @@ export default function LoginForm() {
         <Button className="mt-4 w-full" aria-disabled={isPending}>
           Log in <ArrowRightIcon className="ml-auto h-5 w-5 text-gray-50" />
         </Button>
+        {registered && (
+          <p role="status" className="pt-2 text-sm text-emerald-700">
+            Account created. Sign in to continue.
+          </p>
+        )}
+        <p className="pt-2 text-sm text-gray-600">
+          New patient? <Link href="/register" className="font-medium text-blue-700 hover:underline">Create an account</Link>
+        </p>
         <div
           className="flex h-8 items-end space-x-1"
           aria-live="polite"

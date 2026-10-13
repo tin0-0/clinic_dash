@@ -3,11 +3,12 @@ import {
   visitTypes,
   type AppointmentStatus,
 } from '@/app/lib/appointments';
-import { updateAppointmentStatus } from '@/app/lib/actions';
+import { createPrescription, updateAppointmentStatus } from '@/app/lib/actions';
 import type { UserRole } from '@/app/lib/definitions';
 
 export type AppointmentRow = {
   id: string;
+  patient_id: string;
   patient_name: string;
   doctor_name: string;
   appointment_date: string;
@@ -28,9 +29,11 @@ const statusStyles: Record<AppointmentStatus, string> = {
 export default function AppointmentList({
   appointments,
   role,
+  medications = [],
 }: {
   appointments: AppointmentRow[];
   role: UserRole;
+  medications?: { id: string; name: string }[];
 }) {
   if (appointments.length === 0) {
     return <p className="py-10 text-center text-sm text-gray-500">No appointments yet.</p>;
@@ -47,6 +50,7 @@ export default function AppointmentList({
             <th className="px-3 py-3 font-medium">Visit</th>
             <th className="px-3 py-3 font-medium">Status</th>
             <th className="px-3 py-3 font-medium">Update</th>
+            {role === 'doctor' && <th className="px-3 py-3 font-medium">Prescription</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -106,6 +110,24 @@ export default function AppointmentList({
                     </form>
                   )}
                 </td>
+                {role === 'doctor' && (
+                  <td className="px-3 py-4">
+                    {appointment.status !== 'cancelled' && (
+                      <form action={createPrescription} className="flex min-w-72 flex-wrap items-center gap-2">
+                        <input type="hidden" name="appointmentId" value={appointment.id} />
+                        <select name="medicationId" required defaultValue="" disabled={medications.length === 0} className="max-w-44 rounded border border-gray-300 bg-white px-2 py-1.5 text-xs">
+                          <option value="" disabled>Select medicine</option>
+                          {medications.map((medication) => (
+                            <option key={medication.id} value={medication.id}>{medication.name}</option>
+                          ))}
+                        </select>
+                        <input name="quantity" type="number" min="1" max="1000" required aria-label={`Quantity for ${appointment.patient_name}`} className="w-16 rounded border border-gray-300 px-2 py-1.5 text-xs" />
+                        <input name="dosage" required maxLength={240} placeholder="Directions" aria-label={`Directions for ${appointment.patient_name}`} className="w-28 rounded border border-gray-300 px-2 py-1.5 text-xs" />
+                        <button disabled={medications.length === 0} className="font-medium text-blue-700 hover:underline disabled:opacity-50">Prescribe</button>
+                      </form>
+                    )}
+                  </td>
+                )}
               </tr>
             );
           })}

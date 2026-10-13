@@ -4,6 +4,9 @@ import {
   UserGroupIcon,
   HomeIcon,
   DocumentDuplicateIcon,
+  CalendarDaysIcon,
+  BellIcon,
+  WalletIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -21,11 +24,30 @@ const links = [
     roles: ['admin'],
   },
   { name: 'Customers', href: '/dashboard/customers', icon: UserGroupIcon, roles: ['admin'] },
+  { name: 'Users', href: '/dashboard/users', icon: UserGroupIcon, roles: ['admin'] },
+  {
+    name: 'Notifications',
+    href: '/dashboard/notifications',
+    icon: BellIcon,
+    roles: ['admin', 'doctor', 'patient', 'pharmacy_reception', 'pharmacy_stocker', 'pharmacist'],
+  },
   {
     name: 'Appointments',
     href: '/dashboard/appointments',
     icon: UserGroupIcon,
     roles: ['admin', 'doctor', 'patient', 'pharmacy_reception'],
+  },
+  {
+    name: 'Wallet',
+    href: '/dashboard/wallet',
+    icon: WalletIcon,
+    roles: ['patient'],
+  },
+  {
+    name: 'Availability',
+    href: '/dashboard/doctor',
+    icon: CalendarDaysIcon,
+    roles: ['doctor'],
   },
   {
     name: 'Inventory',

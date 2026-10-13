@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { signOut } from '@/auth';
 
 export default function UnauthorizedPage() {
   return (
@@ -17,6 +18,16 @@ export default function UnauthorizedPage() {
         >
           Return to sign in
         </Link>
+        <form
+          action={async () => {
+            'use server';
+            await signOut({ redirectTo: '/' });
+          }}
+        >
+          <button className="mt-3 inline-flex h-10 items-center rounded-md border border-gray-300 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            Sign out and return home
+          </button>
+        </form>
       </section>
     </main>
   );

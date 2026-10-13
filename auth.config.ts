@@ -14,9 +14,11 @@ function isUserRole(role: unknown): role is UserRole {
   return typeof role === 'string' && Object.hasOwn(roleHome, role);
 }
 
-function hasDashboardAccess(pathname: string, role: UserRole, email: string) {
+function hasDashboardAccess(pathname: string, role: UserRole) {
+  if (pathname.startsWith('/dashboard/notifications')) return true;
+  if (pathname.startsWith('/dashboard/wallet')) return role === 'patient';
   if (pathname.startsWith('/dashboard/user')) {
-    return role === 'patient' && email === 'user@nextmail.com';
+    return role === 'patient';
   }
   if (pathname.startsWith('/dashboard/doctor')) {
     return role === 'admin' || role === 'doctor';
@@ -36,7 +38,7 @@ function hasDashboardAccess(pathname: string, role: UserRole, email: string) {
   if (pathname.startsWith('/dashboard/appointments')) {
     return (
       ['admin', 'doctor', 'pharmacy_reception'].includes(role) ||
-      (role === 'patient' && email === 'user@nextmail.com')
+      role === 'patient'
     );
   }
   return role === 'admin';
@@ -52,12 +54,16 @@ export const authConfig = {
   ],
   callbacks: {
     jwt({ token, user }) {
-      if (user) token.role = user.role;
+      if (user) {
+        token.sub = user.id;
+        token.role = user.role;
+      }
       return token;
     },
     session({ session, token }) {
-      if (session.user && isUserRole(token.role)) {
-        session.user.role = token.role;
+      if (session.user) {
+        if (token.sub) session.user.id = token.sub;
+        if (isUserRole(token.role)) session.user.role = token.role;
       }
       return session;
     },
@@ -67,13 +73,16 @@ export const authConfig = {
 
       if (isOnDashboard) {
         if (!user) return false;
-        if (!user.role || !hasDashboardAccess(nextUrl.pathname, user.role, user.email ?? '')) {
+        if (!user.role || !hasDashboardAccess(nextUrl.pathname, user.role)) {
           return Response.redirect(new URL('/unauthorized', nextUrl));
         }
         return true;
       }
 
-      if (user && (nextUrl.pathname === '/login' || nextUrl.pathname === '/')) {
+      if (
+        user &&
+        ['/login', '/register', '/'].includes(nextUrl.pathname)
+      ) {
         return Response.redirect(new URL(roleHome[user.role] ?? '/unauthorized', nextUrl));
       }
 

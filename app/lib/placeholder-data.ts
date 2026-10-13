@@ -6,6 +6,35 @@ const users = [
     name: 'User',
     email: 'user@nextmail.com',
     password: '123456',
+    role: 'patient',
+  },
+  {
+    id: '510544b2-4001-4271-9855-fec4b6a6442a',
+    name: 'Clinic Admin',
+    email: 'admin@nextmail.com',
+    password: '123456',
+    role: 'admin',
+  },
+  {
+    id: '610544b2-4001-4271-9855-fec4b6a6442a',
+    name: 'Dr. Demo',
+    email: 'doctor@nextmail.com',
+    password: '123456',
+    role: 'doctor',
+  },
+  {
+    id: '710544b2-4001-4271-9855-fec4b6a6442a',
+    name: 'Pharmacy Stocker',
+    email: 'stocker@nextmail.com',
+    password: '123456',
+    role: 'pharmacy_stocker',
+  },
+  {
+    id: '810544b2-4001-4271-9855-fec4b6a6442a',
+    name: 'Clinic Pharmacist',
+    email: 'pharmacist@nextmail.com',
+    password: '123456',
+    role: 'pharmacist',
   },
 ];
 

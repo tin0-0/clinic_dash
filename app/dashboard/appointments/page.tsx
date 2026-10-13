@@ -5,30 +5,25 @@ import BookingForm from '@/app/ui/appointments/booking-form';
 import AppointmentList, { type AppointmentRow } from '@/app/ui/appointments/appointment-list';
 import type { UserRole } from '@/app/lib/definitions';
 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require', prepare: false });
 
 export const dynamic = 'force-dynamic';
 
 export default async function AppointmentsPage() {
   const session = await auth();
   if (!session?.user) redirect('/login');
-  if (
-    session.user.role === 'patient' &&
-    session.user.email !== 'user@nextmail.com'
-  ) {
-    redirect('/unauthorized');
-  }
 
   const role = session.user.role as UserRole;
   const isPatient = role === 'patient';
   const canSeeAppointments = !['pharmacy_stocker', 'pharmacist'].includes(role);
   let appointments: AppointmentRow[] = [];
   let doctors: { id: string; name: string }[] = [];
+  let medications: { id: string; name: string }[] = [];
 
   if (canSeeAppointments) {
     if (role === 'patient') {
       appointments = await sql<AppointmentRow[]>`
-        SELECT a.id, patient.name AS patient_name, doctor.name AS doctor_name,
+        SELECT a.id, a.patient_id, patient.name AS patient_name, doctor.name AS doctor_name,
           a.appointment_date::text, to_char(a.start_time, 'HH24:MI') AS start_time,
           a.duration_minutes, a.visit_type, a.status
         FROM appointments a
@@ -41,8 +36,11 @@ export default async function AppointmentsPage() {
         SELECT id, name FROM users WHERE role = 'doctor' ORDER BY name
       `;
     } else if (role === 'doctor') {
+      medications = await sql<{ id: string; name: string }[]>`
+        SELECT id, name FROM medications ORDER BY name
+      `;
       appointments = await sql<AppointmentRow[]>`
-        SELECT a.id, patient.name AS patient_name, doctor.name AS doctor_name,
+        SELECT a.id, a.patient_id, patient.name AS patient_name, doctor.name AS doctor_name,
           a.appointment_date::text, to_char(a.start_time, 'HH24:MI') AS start_time,
           a.duration_minutes, a.visit_type, a.status
         FROM appointments a
@@ -53,7 +51,7 @@ export default async function AppointmentsPage() {
       `;
     } else {
       appointments = await sql<AppointmentRow[]>`
-        SELECT a.id, patient.name AS patient_name, doctor.name AS doctor_name,
+        SELECT a.id, a.patient_id, patient.name AS patient_name, doctor.name AS doctor_name,
           a.appointment_date::text, to_char(a.start_time, 'HH24:MI') AS start_time,
           a.duration_minutes, a.visit_type, a.status
         FROM appointments a
@@ -90,7 +88,7 @@ export default async function AppointmentsPage() {
         {!canSeeAppointments ? (
           <p className="py-8 text-sm text-gray-600">This workspace does not include appointment access.</p>
         ) : (
-          <AppointmentList appointments={appointments} role={role} />
+          <AppointmentList appointments={appointments} role={role} medications={medications} />
         )}
       </section>
     </main>
