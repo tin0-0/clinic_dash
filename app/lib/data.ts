@@ -30,6 +30,46 @@ export async function fetchRevenue() {
   }
 }
 
+export async function fetchMonthlyPatientCounts() {
+  try {
+    return await sql<{ month_key: string; month_label: string; patient_count: number }[]>`
+      WITH months AS (
+        SELECT date_trunc('month', CURRENT_DATE)::date - (offset_value * INTERVAL '1 month') AS month_start
+        FROM generate_series(11, 0, -1) AS offset_value
+      )
+      SELECT to_char(months.month_start, 'YYYY-MM') AS month_key,
+        to_char(months.month_start, 'Mon YY') AS month_label,
+        COUNT(users.id)::int AS patient_count
+      FROM months
+      LEFT JOIN users ON users.role = 'patient'
+        AND users.created_at >= months.month_start
+        AND users.created_at < months.month_start + INTERVAL '1 month'
+      GROUP BY months.month_start
+      ORDER BY months.month_start
+    `;
+  } catch (error) {
+    console.error('Database Error:', error);
+    throw new Error('Failed to fetch monthly patient counts.');
+  }
+}
+
+export async function fetchCurrentMonthAppointmentOutcomes() {
+  try {
+    const [row] = await sql<{ completed: number; no_show: number }[]>`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+        COUNT(*) FILTER (WHERE status = 'no_show')::int AS no_show
+      FROM appointments
+      WHERE appointment_date >= date_trunc('month', CURRENT_DATE)::date
+        AND appointment_date < (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month')::date
+    `;
+    return row ?? { completed: 0, no_show: 0 };
+  } catch (error) {
+    console.error('Database Error:', error);
+    throw new Error('Failed to fetch appointment outcomes.');
+  }
+}
+
 export async function fetchLatestInvoices() {
   try {
     const data = await sql<LatestInvoiceRaw[]>`

@@ -12,13 +12,18 @@ async function seedUsers() {
       name VARCHAR(255) NOT NULL,
       email TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
-      role VARCHAR(50) NOT NULL DEFAULT 'patient'
+      role VARCHAR(50) NOT NULL DEFAULT 'patient',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `;
 
   await sql`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS role VARCHAR(50) NOT NULL DEFAULT 'patient';
+  `;
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
   `;
 
   const insertedUsers = await Promise.all(
@@ -119,15 +124,45 @@ async function seedAppointments() {
       start_time TIME NOT NULL,
       duration_minutes INT NOT NULL,
       visit_type VARCHAR(50) NOT NULL,
-      status VARCHAR(20) NOT NULL DEFAULT 'scheduled'
-        CHECK (status IN ('scheduled', 'confirmed', 'checked_in', 'completed', 'cancelled')),
+      status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `;
+  await sql`ALTER TABLE appointments DROP CONSTRAINT IF EXISTS appointments_status_check;`;
+  await sql`
+    ALTER TABLE appointments ADD CONSTRAINT appointments_status_check
+    CHECK (status IN ('scheduled', 'confirmed', 'checked_in', 'completed', 'no_show', 'cancelled'));
   `;
   await sql`CREATE INDEX IF NOT EXISTS appointments_doctor_date_idx
     ON appointments (doctor_id, appointment_date, status);`;
   await sql`CREATE INDEX IF NOT EXISTS appointments_patient_date_idx
     ON appointments (patient_id, appointment_date, status);`;
+  await Promise.all([
+    sql`
+      INSERT INTO appointments (
+        id, patient_id, doctor_id, appointment_date, start_time,
+        duration_minutes, visit_type, status
+      )
+      SELECT
+        'a1000000-0000-4000-8000-000000000001'::uuid,
+        patient.id, doctor.id, CURRENT_DATE - 4, '10:00', 30, 'routine', 'completed'
+      FROM users patient CROSS JOIN users doctor
+      WHERE patient.email = 'user@nextmail.com' AND doctor.email = 'doctor@nextmail.com'
+      ON CONFLICT (id) DO NOTHING
+    `,
+    sql`
+      INSERT INTO appointments (
+        id, patient_id, doctor_id, appointment_date, start_time,
+        duration_minutes, visit_type, status
+      )
+      SELECT
+        'a1000000-0000-4000-8000-000000000002'::uuid,
+        patient.id, doctor.id, CURRENT_DATE - 2, '11:00', 30, 'routine', 'no_show'
+      FROM users patient CROSS JOIN users doctor
+      WHERE patient.email = 'user@nextmail.com' AND doctor.email = 'doctor@nextmail.com'
+      ON CONFLICT (id) DO NOTHING
+    `,
+  ]);
 }
 
 async function seedDoctorAvailability() {
@@ -267,6 +302,51 @@ async function seedPayments() {
   `;
 }
 
+async function seedRowLevelSecurity() {
+  await sql`ALTER TABLE users ENABLE ROW LEVEL SECURITY`;
+  await sql`ALTER TABLE appointments ENABLE ROW LEVEL SECURITY`;
+  await sql`GRANT SELECT, INSERT, UPDATE ON users TO authenticated`;
+  await sql`GRANT SELECT, INSERT, UPDATE ON appointments TO authenticated`;
+
+  await sql`DROP POLICY IF EXISTS users_select_self ON users`;
+  await sql`
+    CREATE POLICY users_select_self ON users
+    FOR SELECT TO authenticated
+    USING (id = (SELECT auth.uid()))
+  `;
+  await sql`DROP POLICY IF EXISTS users_insert_self_patient ON users`;
+  await sql`
+    CREATE POLICY users_insert_self_patient ON users
+    FOR INSERT TO authenticated
+    WITH CHECK (id = (SELECT auth.uid()) AND role = 'patient')
+  `;
+  await sql`DROP POLICY IF EXISTS appointments_select_participant ON appointments`;
+  await sql`
+    CREATE POLICY appointments_select_participant ON appointments
+    FOR SELECT TO authenticated
+    USING (
+      patient_id = (SELECT auth.uid()) OR doctor_id = (SELECT auth.uid())
+    )
+  `;
+  await sql`DROP POLICY IF EXISTS appointments_insert_self_patient ON appointments`;
+  await sql`
+    CREATE POLICY appointments_insert_self_patient ON appointments
+    FOR INSERT TO authenticated
+    WITH CHECK (patient_id = (SELECT auth.uid()))
+  `;
+  await sql`DROP POLICY IF EXISTS appointments_update_participant ON appointments`;
+  await sql`
+    CREATE POLICY appointments_update_participant ON appointments
+    FOR UPDATE TO authenticated
+    USING (
+      patient_id = (SELECT auth.uid()) OR doctor_id = (SELECT auth.uid())
+    )
+    WITH CHECK (
+      patient_id = (SELECT auth.uid()) OR doctor_id = (SELECT auth.uid())
+    )
+  `;
+}
+
 export async function GET() {
   if (process.env.NODE_ENV === 'production') {
     return new Response(null, { status: 404 });
@@ -280,6 +360,7 @@ export async function GET() {
     await seedPharmacy();
     await seedNotifications();
     await seedPayments();
+    await seedRowLevelSecurity();
 
     return Response.json({ message: 'Database seeded successfully' });
   } catch (error) {

@@ -11,6 +11,7 @@ export const appointmentStatuses = [
   'confirmed',
   'checked_in',
   'completed',
+  'no_show',
   'cancelled',
 ] as const;
 

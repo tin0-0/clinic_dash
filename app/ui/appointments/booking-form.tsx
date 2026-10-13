@@ -9,11 +9,21 @@ type DoctorOption = {
   name: string;
 };
 
+type PatientOption = {
+  id: string;
+  name: string;
+  email: string;
+};
+
 export default function BookingForm({
   doctors,
+  patients,
+  allowPatientSelect,
   today,
 }: {
   doctors: DoctorOption[];
+  patients: PatientOption[];
+  allowPatientSelect: boolean;
   today: string;
 }) {
   const initialState: AppointmentActionState = { message: null };
@@ -21,6 +31,27 @@ export default function BookingForm({
 
   return (
     <form action={formAction} className="space-y-4">
+      {allowPatientSelect && (
+        <label className="block text-sm font-medium text-gray-700">
+          Patient
+          <select
+            name="patientId"
+            required
+            disabled={patients.length === 0 || pending}
+            defaultValue=""
+            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm"
+          >
+            <option value="" disabled>
+              {patients.length ? 'Select a patient' : 'No patient accounts available'}
+            </option>
+            {patients.map((patient) => (
+              <option key={patient.id} value={patient.id}>
+                {patient.name} · {patient.email}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="block text-sm font-medium text-gray-700">
         Doctor
         <select

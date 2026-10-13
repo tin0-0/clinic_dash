@@ -194,6 +194,115 @@ export async function updateUserRole(formData: FormData) {
   revalidatePath('/dashboard/users');
 }
 
+export async function createPatientAccount(
+  _prevState: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  const session = await auth();
+  if (session?.user.role !== 'admin') return 'Only administrators can add patient accounts.';
+  const parsed = z.object({
+    name: z.string().trim().min(2).max(120),
+    email: z.string().trim().toLowerCase().email(),
+    password: z.string().min(8).max(128),
+  }).safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+  });
+  if (!parsed.success) return parsed.error.issues[0]?.message ?? 'Check the patient details.';
+
+  const password = await bcrypt.hash(parsed.data.password, 10);
+  try {
+    const created = await sql.begin(async (transaction) => {
+      const inserted = await transaction<{ id: string }[]>`
+        INSERT INTO users (name, email, password, role)
+        VALUES (${parsed.data.name}, ${parsed.data.email}, ${password}, 'patient')
+        ON CONFLICT (email) DO NOTHING
+        RETURNING id
+      `;
+      if (!inserted[0]) return false;
+      await transaction`
+        INSERT INTO wallet_accounts (user_id) VALUES (${inserted[0].id})
+      `;
+      return true;
+    });
+    if (!created) return 'An account with that email already exists.';
+  } catch (error) {
+    console.error('Failed to create patient account:', error);
+    return 'Could not create this patient account.';
+  }
+
+  revalidatePath('/dashboard/users');
+  return 'Patient account created.';
+}
+
+export async function updatePatientAccount(
+  _prevState: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  const session = await auth();
+  if (session?.user.role !== 'admin') return 'Only administrators can edit patient accounts.';
+  const parsed = z.object({
+    userId: z.string().uuid(),
+    name: z.string().trim().min(2).max(120),
+    email: z.string().trim().toLowerCase().email(),
+  }).safeParse({
+    userId: formData.get('userId'),
+    name: formData.get('name'),
+    email: formData.get('email'),
+  });
+  if (!parsed.success) return parsed.error.issues[0]?.message ?? 'Check the patient details.';
+
+  try {
+    const updated = await sql<{ id: string }[]>`
+      UPDATE users SET name = ${parsed.data.name}, email = ${parsed.data.email}
+      WHERE id = ${parsed.data.userId} AND role = 'patient'
+      RETURNING id
+    `;
+    if (!updated[0]) return 'Patient account was not found.';
+  } catch (error) {
+    console.error('Failed to update patient account:', error);
+    return 'Could not update this patient. The email may already be in use.';
+  }
+
+  revalidatePath('/dashboard/users');
+  return 'Patient account updated.';
+}
+
+export async function deletePatientAccount(
+  _prevState: string | undefined,
+  formData: FormData,
+): Promise<string | undefined> {
+  const session = await auth();
+  if (session?.user.role !== 'admin') return 'Only administrators can remove patient accounts.';
+  const userId = z.string().uuid().safeParse(formData.get('userId'));
+  if (!userId.success || userId.data === session.user.id) return 'Invalid patient account.';
+
+  try {
+    const deleted = await sql<{ id: string }[]>`
+      DELETE FROM users patient
+      WHERE patient.id = ${userId.data}
+        AND patient.role = 'patient'
+        AND NOT EXISTS (
+          SELECT 1 FROM appointments WHERE patient_id = patient.id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM prescriptions WHERE patient_id = patient.id
+        )
+      RETURNING patient.id
+    `;
+    if (!deleted[0]) {
+      return 'Patient was not found or has appointment/prescription history and cannot be deleted.';
+    }
+  } catch (error) {
+    console.error('Failed to delete patient account:', error);
+    return 'Could not delete this patient account.';
+  }
+
+  revalidatePath('/dashboard/users');
+  return 'Patient account deleted.';
+}
+
 export async function markNotificationRead(formData: FormData) {
   const session = await auth();
   if (!session?.user) return;
@@ -787,6 +896,7 @@ export async function saveDoctorAvailability(
 
 const AppointmentSchema = z.object({
   doctorId: z.string().uuid(),
+  patientId: z.string().uuid().optional(),
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   visitType: z.enum(visitTypes.map(({ value }) => value) as [string, ...string[]]),
@@ -797,14 +907,13 @@ export async function createAppointment(
   formData: FormData,
 ): Promise<AppointmentActionState> {
   const session = await auth();
-  if (
-    session?.user.role !== 'patient'
-  ) {
-    return { message: 'Only patient accounts can book appointments.' };
+  if (!session?.user || !['patient', 'admin', 'pharmacy_reception'].includes(session.user.role)) {
+    return { message: 'Your account cannot create appointments.' };
   }
 
   const parsed = AppointmentSchema.safeParse({
     doctorId: formData.get('doctorId'),
+    patientId: formData.get('patientId') ?? undefined,
     appointmentDate: formData.get('appointmentDate'),
     startTime: formData.get('startTime'),
     visitType: formData.get('visitType'),
@@ -812,11 +921,18 @@ export async function createAppointment(
   if (!parsed.success) return { message: 'Check the appointment details and try again.' };
 
   const { doctorId, appointmentDate, startTime, visitType } = parsed.data;
+  const patientId = session.user.role === 'patient' ? session.user.id : parsed.data.patientId;
+  if (!patientId) return { message: 'Select a patient for this appointment.' };
   const visit = visitTypes.find((item) => item.value === visitType);
   if (!visit) return { message: 'Select a valid visit type.' };
 
   try {
     await sql.begin(async (transaction) => {
+      const patients = await transaction`
+        SELECT id FROM users WHERE id = ${patientId} AND role = 'patient'
+      `;
+      if (patients.length === 0) throw new Error('PATIENT_NOT_FOUND');
+
       await transaction`
         SELECT pg_advisory_xact_lock(hashtext(${doctorId}), hashtext(${appointmentDate}))
       `;
@@ -873,20 +989,21 @@ export async function createAppointment(
           patient_id, doctor_id, appointment_date, start_time,
           duration_minutes, visit_type
         ) VALUES (
-          ${session.user.id}, ${doctorId}, ${appointmentDate}, ${startTime},
+          ${patientId}, ${doctorId}, ${appointmentDate}, ${startTime},
           ${visit.duration}, ${visitType}
         )
       `;
       await transaction`
         INSERT INTO notifications (recipient_id, title, message, href)
         VALUES
-          (${session.user.id}, 'Appointment requested', 'Your appointment request was added to the clinic queue.', '/dashboard/appointments'),
+          (${patientId}, 'Appointment requested', 'Your appointment request was added to the clinic queue.', '/dashboard/appointments'),
           (${doctorId}, 'New appointment request', 'A patient requested an appointment during your working hours.', '/dashboard/appointments')
       `;
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : '';
     const messages: Record<string, string> = {
+      PATIENT_NOT_FOUND: 'That patient is no longer available.',
       DOCTOR_NOT_FOUND: 'That doctor is no longer available.',
       APPOINTMENT_NOT_FUTURE: 'Choose a future date and time.',
       OUTSIDE_WORKING_HOURS: 'That doctor is not available for the selected time.',

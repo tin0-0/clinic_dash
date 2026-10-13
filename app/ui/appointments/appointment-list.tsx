@@ -23,6 +23,7 @@ const statusStyles: Record<AppointmentStatus, string> = {
   confirmed: 'bg-emerald-50 text-emerald-700',
   checked_in: 'bg-amber-50 text-amber-800',
   completed: 'bg-gray-100 text-gray-700',
+  no_show: 'bg-rose-50 text-rose-700',
   cancelled: 'bg-rose-50 text-rose-700',
 };
 

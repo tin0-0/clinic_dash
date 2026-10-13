@@ -18,6 +18,7 @@ export default async function AppointmentsPage() {
   const canSeeAppointments = !['pharmacy_stocker', 'pharmacist'].includes(role);
   let appointments: AppointmentRow[] = [];
   let doctors: { id: string; name: string }[] = [];
+  let patients: { id: string; name: string; email: string }[] = [];
   let medications: { id: string; name: string }[] = [];
 
   if (canSeeAppointments) {
@@ -50,6 +51,16 @@ export default async function AppointmentsPage() {
         ORDER BY a.appointment_date, a.start_time
       `;
     } else {
+      if (role === 'admin' || role === 'pharmacy_reception') {
+        [doctors, patients] = await Promise.all([
+          sql<{ id: string; name: string }[]>`
+            SELECT id, name FROM users WHERE role = 'doctor' ORDER BY name
+          `,
+          sql<{ id: string; name: string; email: string }[]>`
+            SELECT id, name, email FROM users WHERE role = 'patient' ORDER BY name
+          `,
+        ]);
+      }
       appointments = await sql<AppointmentRow[]>`
         SELECT a.id, a.patient_id, patient.name AS patient_name, doctor.name AS doctor_name,
           a.appointment_date::text, to_char(a.start_time, 'HH24:MI') AS start_time,
@@ -71,10 +82,12 @@ export default async function AppointmentsPage() {
         <h1 className="mt-1 text-2xl font-semibold text-gray-950">Appointments</h1>
       </header>
 
-      {isPatient && (
+      {(isPatient || role === 'admin' || role === 'pharmacy_reception') && (
         <section className="max-w-2xl border-b border-gray-200 pb-8">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Request an appointment</h2>
-          <BookingForm doctors={doctors} today={today} />
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            {isPatient ? 'Request an appointment' : 'Create appointment for patient'}
+          </h2>
+          <BookingForm doctors={doctors} patients={patients} allowPatientSelect={!isPatient} today={today} />
         </section>
       )}
 

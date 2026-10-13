@@ -1,5 +1,9 @@
 import { auth } from '@/auth';
 import { updateUserRole } from '@/app/lib/actions';
+import {
+  CreatePatientAccountForm,
+  PatientAccountControls,
+} from '@/app/ui/dashboard/patient-account-controls';
 import type { UserRole } from '@/app/lib/definitions';
 import postgres from 'postgres';
 import { redirect } from 'next/navigation';
@@ -35,8 +39,9 @@ export default async function UsersPage() {
         <p className="text-sm font-medium text-blue-700">Administration</p>
         <h1 className="mt-1 text-2xl font-semibold text-gray-950">Users and roles</h1>
       </header>
+      <CreatePatientAccountForm />
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="border-b border-gray-200 text-xs uppercase text-gray-500">
             <tr>
               <th className="px-3 py-3 font-medium">Name</th>
@@ -57,13 +62,16 @@ export default async function UsersPage() {
                   {user.id === session.user.id ? (
                     <span className="text-xs text-gray-500">Your account</span>
                   ) : (
-                    <form action={updateUserRole} className="flex items-center gap-2">
-                      <input type="hidden" name="userId" value={user.id} />
-                      <select name="role" defaultValue={user.role} aria-label={`Role for ${user.name}`} className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm">
-                        {roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
-                      </select>
-                      <button className="font-medium text-blue-700 hover:underline">Save</button>
-                    </form>
+                    <div className="space-y-3">
+                      {user.role === 'patient' && <PatientAccountControls user={user} />}
+                      <form action={updateUserRole} className="flex items-center gap-2">
+                        <input type="hidden" name="userId" value={user.id} />
+                        <select name="role" defaultValue={user.role} aria-label={`Role for ${user.name}`} className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm">
+                          {roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+                        </select>
+                        <button className="font-medium text-blue-700 hover:underline">Save role</button>
+                      </form>
+                    </div>
                   )}
                 </td>
               </tr>

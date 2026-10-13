@@ -1,99 +1,101 @@
 # Medi-Clinic Dashboard
 
-A Next.js clinic dashboard with Auth.js credentials login, role-protected
-workspaces, appointment scheduling, and pharmacy inventory and dispensing flows.
+Production: **Not deployed yet.** Add the Vercel production URL here after the
+deployment is ready.
+
+## What it does
+
+Medi-Clinic is a role-based clinic workflow demo for managing appointments,
+invoices, customers, and pharmacy inventory. Patients request appointments;
+doctors manage availability and prescriptions; pharmacy staff handle stock and
+dispensing.
+
+## Demo login
+
+Admin: `admin@nextmail.com` / `123456`  
+Patient: `user@nextmail.com` / `123456`
+
+These seeded accounts and all sample data are for demos only. Do not use real
+patient information. Rotate or replace demo credentials before exposing a public
+deployment.
 
 ## Run locally
 
-1. Install dependencies with `pnpm install`.
-2. Set `POSTGRES_URL` in `.env.local` to a PostgreSQL connection string.
-3. Start the app with `pnpm dev`.
-4. Open `/seed` once to initialize the database tables and sample data.
-4. Open `/seed` to initialize or update the database tables and sample data. It
-	can be run again after app schema changes.
-5. Sign in at `/login` with the seeded local admin account to access the dashboard,
-   invoices, and customers:
-	- Email: `admin@nextmail.com`
-	- Password: `123456`
-   The seeded patient account for appointment testing is `user@nextmail.com` with
-   password `123456`. The seeded doctor account is `doctor@nextmail.com` with
-   password `123456`. Pharmacy demo accounts use password `123456`:
-	- Stocker: `stocker@nextmail.com`
-	- Pharmacist: `pharmacist@nextmail.com`
+1. Install dependencies: `pnpm install`.
+2. Copy `.env.example` to `.env.local` and set `POSTGRES_URL` and `AUTH_SECRET`.
+3. Start the app: `pnpm dev`.
+4. Open `http://localhost:3000/seed` once to initialize/update demo tables.
+5. Sign in at `/login` with either demo account above.
 
-The seeded credentials are for local development only. Do not use them in a
-deployed environment. Existing users receive the `patient` role when the seed
-route adds the `users.role` column. Patients can register at `/register`. Admins
-can assign staff roles from the Users page; users need to sign in again for role
-changes to take effect.
+Optional configuration uses the variable names `PAYMENTS_MODE`, `APP_URL`,
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, and
+`RESEND_FROM_EMAIL`. Never put secret values in this README.
 
-## Roles and routes
+## Tech stack
 
-| Role | Workspace | Access |
-| --- | --- | --- |
-| `admin` | `/dashboard` | Dashboard, revenue chart, invoices, customers, users, and appointment queue |
-| `doctor` | `/dashboard/doctor` | Manage weekly hours; `/dashboard/appointments` for the clinical queue |
-| `patient` | `/dashboard/user` | Personal appointment workflow |
-| `pharmacy_reception` | `/dashboard/pharmacy/reception` | Redirects to the appointment queue |
-| `pharmacy_stocker` | `/dashboard/pharmacy/stock` | Add medicines and receive stock |
-| `pharmacist` | `/dashboard/pharmacy/pharmacist` | Dispense prescriptions from available stock |
+Next.js App Router and TypeScript provide server-rendered pages and server
+actions. Auth.js handles sign-in and role checks. Supabase PostgreSQL stores the
+clinic data. Tailwind CSS styles the interface. Local payment simulation keeps
+the demo runnable without payment-provider accounts.
 
-All signed-in roles have a personal notifications inbox at `/dashboard/notifications`.
+## Known limitations
 
-Unauthenticated dashboard requests go to `/login`. Authenticated users without
-the required role go to `/unauthorized`. The role is stored in the database and
-copied into the Auth.js JWT/session; changing a role takes effect after signing
-in again.
+- The dashboard includes the revenue chart plus new-patient growth and
+  completed-versus-no-show charts; chart interpretations use demo seed data.
+- Admins can manage patient-role accounts and create appointments from a filtered
+  patient selector.
+- Supabase RLS policies are installed by `/seed`, but the app's PostgreSQL
+  connection uses a privileged database role and bypasses RLS. RLS is not yet
+  the app's data-isolation boundary; server-side authorization remains in use.
+- The site is a demo, not a compliant production system for real patient data.
+- Real Stripe and Resend flows require provider credentials and webhook setup.
 
-## Appointment workflow
+## What I would do next
 
-Patients can request an appointment by selecting a doctor, visit
-type, date, and start time. Visit types assign durations of 15, 20, 30, 40, or
-45 minutes. The server rejects past appointments, overlapping bookings, and
-bookings beyond the configured 20 appointments per doctor per day. Patients can
-cancel future scheduled appointments. Doctors see their own queue; admins and
-reception staff can see the clinic queue and update appointment status.
+1. Make app queries enforce per-user access through Supabase-authenticated
+  requests, then verify isolation end to end.
+2. Complete local and production smoke tests, including RLS with two users.
+3. Replace demo credentials and sample data before any real clinic deployment.
 
-Availability: doctors can set recurring weekly working hours. Patients can only
-book times that fit within those hours. The demo doctor is seeded Monday to
-Friday, 09:00 to 17:00.
+## Smoke test
 
-Pharmacy: stockers can add medicines and receive stock. Doctors can prescribe
-medication from an appointment, and pharmacists can dispense prescriptions when
-inventory is sufficient. Dispensing updates stock transactionally.
+- [ ] Production URL loads signed out and after sign-in; replace the URL above.
+- [ ] README has run steps and demo credentials; add the live URL after deploy.
+- [ ] Verify signed-out dashboard redirects on the production URL.
+- [x] Patient accounts support create, edit, delete, and list in the admin Users page.
+- [x] Appointments reference patient-role users and staff booking includes a patient selector.
+- [ ] RLS is proven with two users and a denied cross-user insert.
+- [x] Chart 1 asks whether the practice is growing, labels its axes, and starts at zero.
+- [x] Chart 2 is a labeled completed/no-show donut answering a different question.
+- [ ] `PROPOSAL.md` and `DEMO.md` are committed and present on GitHub.
+- [ ] Record a 60–90 second backup demo.
+- [ ] Production deployment and all smoke checks are verified.
 
-The dashboard currently has a revenue bar chart; the brief does not specify a
-pie chart. Local development defaults to simulated payments: admins can mark
-invoices paid in the simulator, and patients can simulate wallet top-ups without
-charging a card. For real USD payments, Stripe Checkout handles invoice payments
-and wallet top-ups. Resend sends invoice payment links.
+## RLS verification
 
-## Database setup
+After running `/seed`, create a second patient in the admin Users page. In the
+Supabase SQL Editor, replace the placeholders below with two different patient
+IDs and the seeded doctor's ID. The insert should fail with SQLSTATE `42501`:
 
-doctor availability, pharmacy inventory, prescriptions, and notifications. It
-deployment. The app uses PostgreSQL through the `POSTGRES_URL` environment
-The `/seed` route initializes users, customers, invoices, revenue, appointments,
-doctor availability, pharmacy inventory, prescriptions, notifications, and
-payment records. It is intended only for local setup; do not expose the seed
-route in a production deployment. The app uses PostgreSQL through the
-`POSTGRES_URL` environment variable.
+```sql
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '<PATIENT_TWO_ID>', true);
+INSERT INTO appointments (
+  patient_id, doctor_id, appointment_date, start_time,
+  duration_minutes, visit_type
+) VALUES (
+  '<PATIENT_ONE_ID>', '<DOCTOR_ID>', CURRENT_DATE + 1, '10:00', 30, 'routine'
+);
+ROLLBACK;
+```
 
-## Payment and email setup
+This checks the database policy. Because the application connects with the
+privileged `POSTGRES_URL`, it does not prove that application requests are
+isolated by RLS.
 
-1. For local demos, set `PAYMENTS_MODE=simulated` in `.env.local`. No Stripe
-	account, Stripe CLI, Resend account, or payment credentials are needed. The
-	simulator is disabled outside development and clearly labels fake payments.
-2. To test real payments, set `PAYMENTS_MODE=stripe` and use a Stripe test-mode
-	secret key for `STRIPE_SECRET_KEY`.
-3. Install Stripe CLI and run
-	`stripe listen --forward-to localhost:3000/api/stripe/webhook`. Set its
-	printed signing secret as `STRIPE_WEBHOOK_SECRET`.
-4. To send real invoice emails, create a Resend API key and verify a sending
-	domain. Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` to the key and a sender
-	on that verified domain.
-5. Set `APP_URL` to the app's origin. Use `http://localhost:3000` locally.
+## Deployment notes
 
-Invoice emails contain a Stripe Checkout link. Wallet top-ups are credited only
-after a valid Stripe webhook; patients can spend wallet credit on pending
-invoices associated with their registered email. The webhook must be reachable
-by Stripe for payments to be fulfilled.
+The `/seed` route is local-only and returns 404 in production. Seed a dedicated
+demo database before deploying. Set the variable names listed above in the host
+environment; never commit `.env` or `.env.local`.

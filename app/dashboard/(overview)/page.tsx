@@ -1,6 +1,8 @@
 import CardWrapper from '@/app/ui/dashboard/cards';
 import RevenueChart from '@/app/ui/dashboard/revenue-chart';
 import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
+import PatientGrowthChart from '@/app/ui/dashboard/patient-growth-chart';
+import AppointmentOutcomesChart from '@/app/ui/dashboard/appointment-outcomes-chart';
 import { lusitana } from '@/app/ui/fonts';
 import { Suspense } from 'react';
 import {
@@ -27,6 +29,10 @@ export default async function Page() {
         <Suspense fallback={<LatestInvoicesSkeleton />}>
           <LatestInvoices />
         </Suspense>
+      </div>
+      <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-8">
+        <PatientGrowthChart />
+        <AppointmentOutcomesChart />
       </div>
     </main>
   );
