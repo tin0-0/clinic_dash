@@ -545,9 +545,19 @@ export async function addMedication(formData: FormData) {
   revalidatePath('/dashboard/pharmacy/stock');
 }
 
-export async function receiveMedicationStock(formData: FormData) {
+export type StockActionState = {
+  message: string;
+  success: boolean;
+};
+
+export async function receiveMedicationStock(
+  _prevState: StockActionState,
+  formData: FormData,
+): Promise<StockActionState> {
   const session = await auth();
-  if (!session?.user || !['admin', 'pharmacy_stocker'].includes(session.user.role)) return;
+  if (!session?.user || !['admin', 'pharmacy_stocker'].includes(session.user.role)) {
+    return { message: 'Your account cannot receive pharmacy stock.', success: false };
+  }
 
   const parsed = z.object({
     medicationId: z.string().uuid(),
@@ -556,15 +566,28 @@ export async function receiveMedicationStock(formData: FormData) {
     medicationId: formData.get('medicationId'),
     quantity: formData.get('quantity'),
   });
-  if (!parsed.success) return;
+  if (!parsed.success) {
+    return { message: 'Enter a valid medication and quantity.', success: false };
+  }
 
-  await sql`
-    UPDATE medications
-    SET quantity = quantity + ${parsed.data.quantity}, updated_at = NOW()
-    WHERE id = ${parsed.data.medicationId}
-  `;
+  try {
+    const updated = await sql<{ id: string }[]>`
+      UPDATE medications
+      SET quantity = quantity + ${parsed.data.quantity}, updated_at = NOW()
+      WHERE id = ${parsed.data.medicationId}
+      RETURNING id
+    `;
+    if (updated.length === 0) {
+      return { message: 'Medication was not found. Refresh and try again.', success: false };
+    }
+  } catch (error) {
+    console.error('Failed to receive medication stock:', error);
+    return { message: 'Stock could not be updated. Check the dev server output.', success: false };
+  }
+
   revalidatePath('/dashboard/pharmacy/stock');
   revalidatePath('/dashboard/pharmacy/pharmacist');
+  return { message: 'Stock received and inventory updated.', success: true };
 }
 
 export async function createPrescription(formData: FormData) {

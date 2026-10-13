@@ -1,5 +1,6 @@
 import postgres from 'postgres';
-import { addMedication, receiveMedicationStock } from '@/app/lib/actions';
+import { addMedication } from '@/app/lib/actions';
+import ReceiveStockForm from '@/app/ui/pharmacy/receive-stock-form';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require', prepare: false });
 
@@ -82,11 +83,7 @@ export default async function PharmacyStockPage() {
                   <td className="px-3 py-4 text-gray-700">{medication.reorder_level}</td>
                   <td className="px-3 py-4 text-gray-700">{medication.expiration_date ?? '—'}</td>
                   <td className="px-3 py-4">
-                    <form action={receiveMedicationStock} className="flex items-center gap-2">
-                      <input type="hidden" name="medicationId" value={medication.id} />
-                      <input name="quantity" type="number" min="1" defaultValue="10" required aria-label={`Quantity received for ${medication.name}`} className="w-20 rounded-md border border-gray-300 p-2 text-sm" />
-                      <button className="text-sm font-semibold text-blue-700 hover:underline">Receive</button>
-                    </form>
+                    <ReceiveStockForm medicationId={medication.id} medicationName={medication.name} />
                   </td>
                 </tr>
               ))}
