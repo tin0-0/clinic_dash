@@ -24,7 +24,7 @@ export default function LoginForm() {
 
   return (
     <form action={formAction} className="space-y-3">
-      <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-8">
+      <div className="flex-1 rounded-md bg-[#fff7f9] px-6 pb-4 pt-8">
         <h1 className={`${lusitana.className} mb-3 text-2xl`}>
           Please log in to continue.
         </h1>
@@ -38,7 +38,7 @@ export default function LoginForm() {
             </label>
             <div className="relative">
               <input
-                className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+                className="peer block w-full rounded-md border border-[#e5c7d2] bg-white py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500 focus:border-[#a82d5a] focus:outline-[#a82d5a]"
                 id="email"
                 type="email"
                 name="email"
@@ -57,7 +57,7 @@ export default function LoginForm() {
             </label>
             <div className="relative">
               <input
-                className="peer block w-full rounded-md border border-gray-200 py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500"
+                className="peer block w-full rounded-md border border-[#e5c7d2] bg-white py-[9px] pl-10 text-sm outline-2 placeholder:text-gray-500 focus:border-[#a82d5a] focus:outline-[#a82d5a]"
                 id="password"
                 type="password"
                 name="password"
@@ -70,7 +70,7 @@ export default function LoginForm() {
           </div>
         </div>
         <input type="hidden" name="redirectTo" value={callbackUrl} />
-        <Button className="mt-4 w-full" aria-disabled={isPending}>
+        <Button variant="clinic" className="mt-4 w-full" aria-disabled={isPending}>
           Log in <ArrowRightIcon className="ml-auto h-5 w-5 text-gray-50" />
         </Button>
         {registered && (
@@ -79,7 +79,7 @@ export default function LoginForm() {
           </p>
         )}
         <p className="pt-2 text-sm text-gray-600">
-          New patient? <Link href="/register" className="font-medium text-blue-700 hover:underline">Create an account</Link>
+          New patient? <Link href="/register" className="font-medium text-[#a82d5a] hover:underline">Create an account</Link>
         </p>
         <div
           className="flex h-8 items-end space-x-1"
