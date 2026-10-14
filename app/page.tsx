@@ -114,10 +114,9 @@ export default function Page() {
           <div className="absolute -left-5 top-8 h-28 w-28 border-l border-t border-[#cf8da5]" aria-hidden="true" />
           <div className="relative h-[430px] overflow-hidden rounded-t-[48%] rounded-b-md bg-[#efd6df] sm:h-[520px]">
             <Image
-              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1400&q=85"
-              alt="Doctor ready to welcome a patient"
+              src="/doctor-portrait.jpeg"
+              alt="Medi-Clinic doctor"
               fill
-              unoptimized
               loading="eager"
               sizes="(max-width: 768px) 100vw, 48vw"
               className="object-cover object-center"
