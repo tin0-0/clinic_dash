@@ -4,7 +4,7 @@ import RegisterForm from '@/app/ui/register-form';
 
 export default function RegisterPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 p-5">
+    <main className="flex min-h-screen items-center justify-center bg-[#fff8fb] p-5">
       <section className="w-full max-w-md">
         <Link href="/" className="mb-6 inline-flex rounded-md bg-blue-700 px-4 py-3 text-white">
           <AcmeLogo />
